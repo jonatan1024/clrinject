@@ -8,7 +8,7 @@ namespace invader
 {
     class invader
     {
-        static void Main(string[] args) { 
+        static int Main(string[] args) { 
             /*Console.WriteLine(AppDomain.CurrentDomain.GetData("dummy"));
             string x = Console.ReadLine();
             AppDomain.CurrentDomain.SetData("dummy", x);
@@ -16,6 +16,8 @@ namespace invader
             Console.WriteLine("data = "+ AppDomain.CurrentDomain.GetData("dummy"));
             Console.Write("new data = ");
             AppDomain.CurrentDomain.SetData("dummy", Console.ReadLine());
+
+            return 0x12345678;
         }
     }
 }

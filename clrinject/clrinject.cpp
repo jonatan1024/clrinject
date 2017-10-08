@@ -25,11 +25,11 @@ struct dataStruct {
 
 #pragma section(REMOTE_CODE_SECTION,read,execute)
 #pragma const_seg(REMOTE_CONST_SECTION)
-#pragma warning(disable:4102)
+#pragma warning(disable:4102 4254)
 #pragma comment(linker, "/merge:" REMOTE_CONST_SECTION "=" REMOTE_CODE_SECTION)
 //if the string are not present in remConst section, use following pragma instead of the previous one
 //#pragma comment(linker, "/merge:.rdata=" REMOTE_CODE_SECTION)
-#pragma warning(default:4102)
+#pragma warning(default:4102 4254)
 
 //late include to move all used constants into remConst
 #include <metahost.h>
@@ -40,12 +40,17 @@ struct dataStruct {
 #define CC(constant) (*CA(&constant))
 #define RELOCATION localData->relocation
 
-#define REMOTE_ERROR(cleanupLevel, message) do {\
+#define REMOTE_ERROR_RET(cleanupLevel, message, returnValue) do {\
 	localData->result.status = localData->GetLastError();\
-	STRCPY(localData->result.statusMessage, message);\
-	retVal = 1;\
+	STRCPY(localData->result.statusMessage, CC(message));\
+	retVal = returnValue;\
 	goto cleanup ## cleanupLevel;\
 } while(0)
+
+#define REMOTE_ERROR(cleanupLevel, message) REMOTE_ERROR_RET(cleanupLevel, message, 1)
+#define REMOTE_ERROR_STATUS(cleanupLevel, message) if(status != S_OK){\
+	REMOTE_ERROR_RET(cleanupLevel, message, status);\
+}
 
 __declspec(code_seg("remCode")) __declspec(safebuffers)
 static DWORD WINAPI RemoteProc(void * param) {
@@ -53,61 +58,85 @@ static DWORD WINAPI RemoteProc(void * param) {
 	DWORD retVal = 0;
 
 	HMODULE hMSCorEE = localData->GetModuleHandleA(CC("MSCorEE.dll"));
+	if (!hMSCorEE)
+		REMOTE_ERROR(0, "GetModuleHandleA of MSCorEE.dll failed!");
 	HMODULE hOleAut32 = localData->GetModuleHandleA(CC("OleAut32.dll"));
+	if (!hOleAut32)
+		REMOTE_ERROR(0, "GetModuleHandleA of OleAut32.dll failed!");
 	auto _CLRCreateInstance = (HRESULT(WINAPI*)(REFCLSID, REFIID, LPVOID*))localData->GetProcAddress(hMSCorEE, CC("CLRCreateInstance"));
+	if (!_CLRCreateInstance)
+		REMOTE_ERROR(0, "GetProcAddress of MSCorEE/CLRCreateInstance failed!");
 	auto _SysAllocString = (BSTR(WINAPI*)(const OLECHAR*))localData->GetProcAddress(hOleAut32, CC("SysAllocString"));
+	if (!_SysAllocString)
+		REMOTE_ERROR(0, "GetProcAddress of OleAut32/SysAllocString failed!");
 	auto _SysFreeString = (void(WINAPI*)(BSTR))localData->GetProcAddress(hOleAut32, CC("SysFreeString"));
+	if (!_SysFreeString)
+		REMOTE_ERROR(0, "GetProcAddress of OleAut32/SysFreeString failed!");
 
 	ICLRMetaHost* pCLRMetaHost = NULL;
 
 	HRESULT status;
 
 	status = _CLRCreateInstance(CC(CLSID_CLRMetaHost), CC(IID_ICLRMetaHost), (LPVOID*)&pCLRMetaHost);
-	if (status != S_OK)
-		return status;
+	REMOTE_ERROR_STATUS(0, "CLRCreateInstance failed!");
 
 	IEnumUnknown *pEnumUnknown = NULL;
 	status = pCLRMetaHost->EnumerateLoadedRuntimes(localData->GetCurrentProcess(), &pEnumUnknown);
+	REMOTE_ERROR_STATUS(1, "ICLRMetaHost->EnumerateLoadedRuntimes failed!");
 
 	IUnknown* pCLRRuntimeInfoThunk = NULL;
 	ULONG fetched = 0;
 
-	while (pEnumUnknown->Next(1, &pCLRRuntimeInfoThunk, &fetched) == S_OK && fetched == 1) {
+	while ((status = pEnumUnknown->Next(1, &pCLRRuntimeInfoThunk, &fetched)) == S_OK && fetched == 1) {
 		ICLRRuntimeInfo* pCLRRuntimeInfo = NULL;
 		status = pCLRRuntimeInfoThunk->QueryInterface(CC(IID_ICLRRuntimeInfo), (LPVOID*)&pCLRRuntimeInfo);
+		REMOTE_ERROR_STATUS(2, "IUnknown->QueryInterface(ICLRRuntimeInfo) failed!");
 
 		BOOL started;
 		DWORD startedFlags;
 		status = pCLRRuntimeInfo->IsStarted(&started, &startedFlags);
-
+		REMOTE_ERROR_STATUS(2, "ICLRRuntimeInfo->IsStarted failed!");
 		if (!started)
-			continue;
+			goto cleanup2;
 
 		ICorRuntimeHost* pCorRuntimeHost = NULL;
 		status = pCLRRuntimeInfo->GetInterface(CC(CLSID_CorRuntimeHost), CC(IID_ICorRuntimeHost), (LPVOID*)&pCorRuntimeHost);
-
-		//status = pCorRuntimeHost->Start();
+		REMOTE_ERROR_STATUS(3, "ICLRRuntimeInfo->GetInterface(ICorRuntimeHost) failed!");
 
 		HDOMAINENUM domainEnum;
 		status = pCorRuntimeHost->EnumDomains(&domainEnum);
+		REMOTE_ERROR_STATUS(4, "ICorRuntimeHost->EnumDomains failed!");
+
 		IUnknown * pAppDomainThunk = NULL;
-		while (pCorRuntimeHost->NextDomain(domainEnum, &pAppDomainThunk) == S_OK) {
+		while ((status = pCorRuntimeHost->NextDomain(domainEnum, &pAppDomainThunk)) == S_OK) {
 			mscorlib::_AppDomain * pAppDomain = NULL;
 			status = pAppDomainThunk->QueryInterface(CC(__uuidof(mscorlib::_AppDomain)), (LPVOID*)&pAppDomain);
+			REMOTE_ERROR_STATUS(5, "IUnknown->QueryInterface(_AppDomain) failed!");
 
 			BSTR assemblyFile = _SysAllocString(localData->options.assemblyFile);
-			pAppDomain->ExecuteAssembly_2(assemblyFile, &localData->result.retVal);
+			status = pAppDomain->ExecuteAssembly_2(assemblyFile, &localData->result.retVal);
+			REMOTE_ERROR_STATUS(6, "_AppDomain->ExecuteAssembly failed!");
 
+		cleanup6:
 			_SysFreeString(assemblyFile);
 			pAppDomain->Release();
+		cleanup5:
 			pAppDomainThunk->Release();
 		}
+		if (status != S_FALSE) {
+			REMOTE_ERROR_STATUS(4, "ICorRuntimeHost->NextDomain failed!");
+		}
+	cleanup4:
 		pCorRuntimeHost->Release();
+	cleanup3:
 		pCLRRuntimeInfo->Release();
+	cleanup2:
 		pCLRRuntimeInfoThunk->Release();
 	}
 	pEnumUnknown->Release();
+cleanup1:
 	pCLRMetaHost->Release();
+cleanup0:
 	return retVal;
 }
 
