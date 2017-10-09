@@ -6,6 +6,7 @@
 
 struct AppDomain {
 	OLECHAR friendlyName[256];
+	bool injected;
 };
 
 struct Runtime {
@@ -28,6 +29,7 @@ struct InjectionResult {
 
 struct InjectionOptions {
 	bool enumerate;
+	int appDomainIndex;
 	DWORD processId;
 	OLECHAR assemblyFile[MAX_PATH];
 };

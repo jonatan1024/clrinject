@@ -8,7 +8,7 @@
 	if (!source[i]) break;\
 }
 
-struct dataStruct {
+struct RemoteDataStruct {
 	int relocation;
 	HMODULE(WINAPI *GetModuleHandleA)(LPCSTR);
 	FARPROC(WINAPI *GetProcAddress)(HMODULE, LPCSTR);
@@ -41,8 +41,8 @@ struct dataStruct {
 #define RELOCATION localData->relocation
 
 #define REMOTE_ERROR_RET(cleanupLevel, message, returnValue) do {\
-	localData->result.status = localData->GetLastError();\
-	STRCPY(localData->result.statusMessage, CC(message));\
+	result.status = localData->GetLastError();\
+	STRCPY(result.statusMessage, CC(message));\
 	retVal = returnValue;\
 	goto cleanup ## cleanupLevel;\
 } while(0)
@@ -54,7 +54,9 @@ struct dataStruct {
 
 __declspec(code_seg("remCode")) __declspec(safebuffers)
 static DWORD WINAPI RemoteProc(void * param) {
-	dataStruct * localData = (dataStruct*)param;
+	RemoteDataStruct * localData = (RemoteDataStruct*)param;
+	const InjectionOptions& options = localData->options;
+	InjectionResult& result = localData->result;
 	DWORD retVal = 0;
 
 	HMODULE hMSCorEE = localData->GetModuleHandleA(CC("MSCorEE.dll"));
@@ -87,26 +89,28 @@ static DWORD WINAPI RemoteProc(void * param) {
 	IUnknown* pCLRRuntimeInfoThunk = NULL;
 	ULONG fetched = 0;
 
+	int appDomainIndex = 1;
+
 	while ((status = pEnumUnknown->Next(1, &pCLRRuntimeInfoThunk, &fetched)) == S_OK && fetched == 1) {
-		if (localData->result.numRuntimes >= MAX_RUNTIMES) {
-			STRCPY(localData->result.statusMessage, CC("Too many Runtimes!"));
-			localData->result.status = MAX_RUNTIMES;
+		if (result.numRuntimes >= MAX_RUNTIMES) {
+			STRCPY(result.statusMessage, CC("Too many Runtimes!"));
+			result.status = MAX_RUNTIMES;
 			retVal = 2;
 			goto cleanup2;
 		}
-		Runtime * resultRuntime = &localData->result.runtimes[localData->result.numRuntimes++];
+		Runtime& resultRuntime = result.runtimes[result.numRuntimes++];
 
 		ICLRRuntimeInfo* pCLRRuntimeInfo = NULL;
 		status = pCLRRuntimeInfoThunk->QueryInterface(CC(IID_ICLRRuntimeInfo), (LPVOID*)&pCLRRuntimeInfo);
 		REMOTE_ERROR_STATUS(2, "IUnknown->QueryInterface(ICLRRuntimeInfo) failed!");
 
-		DWORD versionLength = sizeof(resultRuntime->version) / sizeof(wchar_t);
-		status = pCLRRuntimeInfo->GetVersionString(resultRuntime->version, &versionLength);
+		DWORD versionLength = sizeof(resultRuntime.version) / sizeof(wchar_t);
+		status = pCLRRuntimeInfo->GetVersionString(resultRuntime.version, &versionLength);
 		REMOTE_ERROR_STATUS(3, "ICLRRuntimeInfo->GetVersionString failed!");
 
-		status = pCLRRuntimeInfo->IsStarted(&resultRuntime->started, &resultRuntime->startedFlags);
+		status = pCLRRuntimeInfo->IsStarted(&resultRuntime.started, &resultRuntime.startedFlags);
 		REMOTE_ERROR_STATUS(3, "ICLRRuntimeInfo->IsStarted failed!");
-		if (!resultRuntime->started)
+		if (!resultRuntime.started)
 			goto cleanup2;
 
 		ICorRuntimeHost* pCorRuntimeHost = NULL;
@@ -119,13 +123,13 @@ static DWORD WINAPI RemoteProc(void * param) {
 
 		IUnknown * pAppDomainThunk = NULL;
 		while ((status = pCorRuntimeHost->NextDomain(domainEnum, &pAppDomainThunk)) == S_OK) {
-			if (resultRuntime->numAppDomains >= MAX_APPDOMAINS) {
-				STRCPY(localData->result.statusMessage, CC("Too many AppDomains!"));
-				localData->result.status = MAX_APPDOMAINS;
+			if (resultRuntime.numAppDomains >= MAX_APPDOMAINS) {
+				STRCPY(result.statusMessage, CC("Too many AppDomains!"));
+				result.status = MAX_APPDOMAINS;
 				retVal = 2;
 				goto cleanup5;
 			}
-			AppDomain * resultAppDomain = &resultRuntime->appDomains[resultRuntime->numAppDomains++];
+			AppDomain& resultAppDomain = resultRuntime.appDomains[resultRuntime.numAppDomains++];
 
 			mscorlib::_AppDomain * pAppDomain = NULL;
 			status = pAppDomainThunk->QueryInterface(CC(__uuidof(mscorlib::_AppDomain)), (LPVOID*)&pAppDomain);
@@ -134,13 +138,15 @@ static DWORD WINAPI RemoteProc(void * param) {
 			BSTR friendlyName;
 			status = pAppDomain->get_FriendlyName(&friendlyName);
 			REMOTE_ERROR_STATUS(6, "_AppDomain->get_FriendlyName failed!");
-			STRCPY(resultAppDomain->friendlyName, friendlyName);
+			STRCPY(resultAppDomain.friendlyName, friendlyName);
 			_SysFreeString(friendlyName);
 
-			if (!localData->options.enumerate) {
-				BSTR assemblyFile = _SysAllocString(localData->options.assemblyFile);
-				status = pAppDomain->ExecuteAssembly_2(assemblyFile, &localData->result.retVal);
+			if (!options.enumerate && (!options.appDomainIndex || options.appDomainIndex == appDomainIndex)) {
+				BSTR assemblyFile = _SysAllocString(options.assemblyFile);
+				status = pAppDomain->ExecuteAssembly_2(assemblyFile, &result.retVal);
 				REMOTE_ERROR_STATUS(7, "_AppDomain->ExecuteAssembly failed!");
+
+				resultAppDomain.injected = true;
 
 			cleanup7:
 				_SysFreeString(assemblyFile);
@@ -149,6 +155,8 @@ static DWORD WINAPI RemoteProc(void * param) {
 			pAppDomain->Release();
 		cleanup5:
 			pAppDomainThunk->Release();
+
+			appDomainIndex++;
 		}
 		if (status != S_FALSE) {
 			REMOTE_ERROR_STATUS(4, "ICorRuntimeHost->NextDomain failed!");
@@ -236,7 +244,7 @@ int Inject(const InjectionOptions * options, InjectionResult * result) {
 	if (!WriteProcessMemory(process, remoteSectionAddr, remoteSection, remoteSectionLen, NULL))
 		INJECT_ERROR(2, "WriteProcessMemory for remote procedure code failed!");
 
-	dataStruct localData;
+	RemoteDataStruct localData;
 	localData.relocation = (byte*)remoteSectionAddr - (byte*)remoteSection;
 	localData.GetModuleHandleA = GetModuleHandleA;
 	localData.GetProcAddress = GetProcAddress;
@@ -246,10 +254,10 @@ int Inject(const InjectionOptions * options, InjectionResult * result) {
 	memcpy(&localData.options, options, sizeof(InjectionOptions));
 	memset(&localData.result, 0, sizeof(InjectionResult));
 
-	LPVOID remoteDataAddr = VirtualAllocEx(process, NULL, sizeof(dataStruct), MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+	LPVOID remoteDataAddr = VirtualAllocEx(process, NULL, sizeof(RemoteDataStruct), MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 	if (!remoteDataAddr)
 		INJECT_ERROR(2, "VirtualAllocEx for remote data failed!");
-	if (!WriteProcessMemory(process, remoteDataAddr, &localData, sizeof(dataStruct), NULL))
+	if (!WriteProcessMemory(process, remoteDataAddr, &localData, sizeof(RemoteDataStruct), NULL))
 		INJECT_ERROR(3, "WriteProcessMemory for remote data failed!");
 
 	HANDLE thread = CreateRemoteThread(process, NULL, 0, (LPTHREAD_START_ROUTINE)((byte*)remoteSectionAddr + ((byte*)RemoteProc - (byte*)remoteSection)), remoteDataAddr, NULL, NULL);
@@ -261,7 +269,7 @@ int Inject(const InjectionOptions * options, InjectionResult * result) {
 		INJECT_ERROR(4, "GetExitCodeThread of remote procedure failed!");
 
 	retVal = remoteRetVal;
-	if (!ReadProcessMemory(process, &((dataStruct*)remoteDataAddr)->result, result, sizeof(InjectionResult), NULL))
+	if (!ReadProcessMemory(process, &((RemoteDataStruct*)remoteDataAddr)->result, result, sizeof(InjectionResult), NULL))
 		INJECT_ERROR(4, "ReadProcessMemory for injection result failed!");
 
 cleanup4:
