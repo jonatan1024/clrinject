@@ -1,18 +1,33 @@
 #pragma once
 #include <Windows.h>
 
-struct AppDomain {
+#define MAX_RUNTIMES 8
+#define MAX_APPDOMAINS 32
 
+struct AppDomain {
+	OLECHAR friendlyName[256];
+};
+
+struct Runtime {
+	WCHAR version[32];
+	BOOL started;
+	DWORD startedFlags;
+
+	int numAppDomains;
+	AppDomain appDomains[MAX_APPDOMAINS];
 };
 
 struct InjectionResult {
 	long retVal;
 	DWORD status;
 	char statusMessage[256];
-	AppDomain enumeration;
+
+	int numRuntimes;
+	Runtime runtimes[MAX_RUNTIMES];
 };
 
 struct InjectionOptions {
+	bool enumerate;
 	DWORD processId;
 	OLECHAR assemblyFile[MAX_PATH];
 };

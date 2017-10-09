@@ -88,15 +88,25 @@ static DWORD WINAPI RemoteProc(void * param) {
 	ULONG fetched = 0;
 
 	while ((status = pEnumUnknown->Next(1, &pCLRRuntimeInfoThunk, &fetched)) == S_OK && fetched == 1) {
+		if (localData->result.numRuntimes >= MAX_RUNTIMES) {
+			STRCPY(localData->result.statusMessage, CC("Too many Runtimes!"));
+			localData->result.status = MAX_RUNTIMES;
+			retVal = 2;
+			goto cleanup2;
+		}
+		Runtime * resultRuntime = &localData->result.runtimes[localData->result.numRuntimes++];
+
 		ICLRRuntimeInfo* pCLRRuntimeInfo = NULL;
 		status = pCLRRuntimeInfoThunk->QueryInterface(CC(IID_ICLRRuntimeInfo), (LPVOID*)&pCLRRuntimeInfo);
 		REMOTE_ERROR_STATUS(2, "IUnknown->QueryInterface(ICLRRuntimeInfo) failed!");
 
-		BOOL started;
-		DWORD startedFlags;
-		status = pCLRRuntimeInfo->IsStarted(&started, &startedFlags);
-		REMOTE_ERROR_STATUS(2, "ICLRRuntimeInfo->IsStarted failed!");
-		if (!started)
+		DWORD versionLength = sizeof(resultRuntime->version) / sizeof(wchar_t);
+		status = pCLRRuntimeInfo->GetVersionString(resultRuntime->version, &versionLength);
+		REMOTE_ERROR_STATUS(3, "ICLRRuntimeInfo->GetVersionString failed!");
+
+		status = pCLRRuntimeInfo->IsStarted(&resultRuntime->started, &resultRuntime->startedFlags);
+		REMOTE_ERROR_STATUS(3, "ICLRRuntimeInfo->IsStarted failed!");
+		if (!resultRuntime->started)
 			goto cleanup2;
 
 		ICorRuntimeHost* pCorRuntimeHost = NULL;
@@ -109,16 +119,33 @@ static DWORD WINAPI RemoteProc(void * param) {
 
 		IUnknown * pAppDomainThunk = NULL;
 		while ((status = pCorRuntimeHost->NextDomain(domainEnum, &pAppDomainThunk)) == S_OK) {
+			if (resultRuntime->numAppDomains >= MAX_APPDOMAINS) {
+				STRCPY(localData->result.statusMessage, CC("Too many AppDomains!"));
+				localData->result.status = MAX_APPDOMAINS;
+				retVal = 2;
+				goto cleanup5;
+			}
+			AppDomain * resultAppDomain = &resultRuntime->appDomains[resultRuntime->numAppDomains++];
+
 			mscorlib::_AppDomain * pAppDomain = NULL;
 			status = pAppDomainThunk->QueryInterface(CC(__uuidof(mscorlib::_AppDomain)), (LPVOID*)&pAppDomain);
 			REMOTE_ERROR_STATUS(5, "IUnknown->QueryInterface(_AppDomain) failed!");
 
-			BSTR assemblyFile = _SysAllocString(localData->options.assemblyFile);
-			status = pAppDomain->ExecuteAssembly_2(assemblyFile, &localData->result.retVal);
-			REMOTE_ERROR_STATUS(6, "_AppDomain->ExecuteAssembly failed!");
+			BSTR friendlyName;
+			status = pAppDomain->get_FriendlyName(&friendlyName);
+			REMOTE_ERROR_STATUS(6, "_AppDomain->get_FriendlyName failed!");
+			STRCPY(resultAppDomain->friendlyName, friendlyName);
+			_SysFreeString(friendlyName);
 
+			if (!localData->options.enumerate) {
+				BSTR assemblyFile = _SysAllocString(localData->options.assemblyFile);
+				status = pAppDomain->ExecuteAssembly_2(assemblyFile, &localData->result.retVal);
+				REMOTE_ERROR_STATUS(7, "_AppDomain->ExecuteAssembly failed!");
+
+			cleanup7:
+				_SysFreeString(assemblyFile);
+			}
 		cleanup6:
-			_SysFreeString(assemblyFile);
 			pAppDomain->Release();
 		cleanup5:
 			pAppDomainThunk->Release();

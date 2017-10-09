@@ -31,12 +31,16 @@ DWORD GetProcessIdByName(const char * processName) {
 void usage() {
 	fprintf(stderr,
 		"Usage:\n"
-		"\tclrinject-cli.exe -p <processId/processName> -a <assemblyFile>\n"
+		"\tclrinject-cli.exe -p <processId/processName> -a <assemblyFile>\n\n"
+		"Addition options:\n"
+		"\t-e\tEnumerate Runtimes and AppDomains"
 	);
 	exit(1);
 }
 
 int main(int argc, char** argv) {
+	InjectionOptions options;
+	options.enumerate = false;
 	char * processName = NULL;
 	char * assemblyFile = NULL;
 
@@ -60,6 +64,9 @@ int main(int argc, char** argv) {
 					continue;
 				}
 				break;
+			case 'e':
+				options.enumerate = true;
+				continue;
 			}
 		}
 		fprintf(stderr, "Unexpected argument '%s'!\n\n", argv[argi]);
@@ -67,7 +74,7 @@ int main(int argc, char** argv) {
 	}
 
 	//check arguments validity
-	if (!processName || !assemblyFile) {
+	if (!processName || (!assemblyFile && !options.enumerate)) {
 		fprintf(stderr, "Process or assembly file was not specified!\n\n");
 		usage();
 	}
@@ -82,15 +89,26 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
-	InjectionOptions options;
 	options.processId = processId;
 	lstrcpynW(options.assemblyFile, CA2W(assemblyFile), MAX_PATH);
 
 	InjectionResult result;
 	int retVal = Inject(&options, &result);
+	if (options.enumerate) {
+		printf("Enumeration:\n");
+		int index = 0;
+		for (int i = 0; i < result.numRuntimes; i++) {
+			const Runtime& runtime = result.runtimes[i];
+			printf("#%d\tRuntime Version: '%ls'; %s\n", index++, runtime.version, runtime.started ? "Started" : "Not started");
+			for (int j = 0; j < runtime.numAppDomains; j++) {
+				const AppDomain& appDomain = runtime.appDomains[j];
+				printf("#%d\t\tAppDomain Name: '%ls'\n", index++, appDomain.friendlyName);
+			}
+		}
+	}
 	if (retVal) {
 		if(result.status || result.statusMessage[0])
-			fprintf(stderr, "Injection failed, code: 0x%08X, reason: '%s'!\n", result.status, result.statusMessage);
+			fprintf(stderr, "Injection failed, return value: 0x%08X, code: 0x%08X, reason: '%s'!\n", retVal, result.status, result.statusMessage);
 		else
 			fprintf(stderr, "Injection failed, return value: 0x%08X!\n", retVal);
 		return 1;
