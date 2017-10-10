@@ -27,7 +27,7 @@ namespace Victim
                 AppDomain.CurrentDomain.SetData("dummy", "Original content");
                 while (true)
                 {
-                    Console.WriteLine("{0}: {1}",AppDomain.CurrentDomain.FriendlyName, AppDomain.CurrentDomain.GetData("dummy"));
+                    Console.WriteLine("{0}: {1}", AppDomain.CurrentDomain.FriendlyName, AppDomain.CurrentDomain.GetData("dummy"));
                     Thread.Sleep(TimeSpan.FromSeconds(5));
                 }
             });

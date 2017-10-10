@@ -33,18 +33,18 @@ void usage() {
 		"Usage:\n"
 		"\tclrinject-cli.exe -p <processId/processName> -a <assemblyFile>\n\n"
 		"Addition options:\n"
-		"\t-e\tEnumerate Runtimes and AppDomains."
-		"\t-d #\tInject only into #-th AppDomain. Default = 0, inject into every AD."
+		"\t-e\tEnumerate Runtimes and AppDomains.\n"
+		"\t-d #\tInject only into #-th AppDomain. Default = 0, inject into every AppDomain.\n"
+		"\t-i X.Y\tCreate an instance of class Y from namespace X.\n"
 	);
 	exit(1);
 }
 
 int main(int argc, char** argv) {
-	InjectionOptions options;
-	options.enumerate = false;
-	options.appDomainIndex = 0;
+	InjectionOptions options = {};
 	char * processName = NULL;
 	char * assemblyFile = NULL;
+	char * typeName = NULL;
 
 	//handle command line arguments
 	int argi = 0;
@@ -75,6 +75,13 @@ int main(int argc, char** argv) {
 					options.appDomainIndex = strtol(argv[argi], NULL, 10);
 					continue;
 				}
+			case 'i':
+				if (argi + 1 < argc) {
+					argi++;
+					typeName = argv[argi];
+					continue;
+				}
+				break;
 			}
 		}
 		fprintf(stderr, "Unexpected argument '%s'!\n\n", argv[argi]);
@@ -98,7 +105,10 @@ int main(int argc, char** argv) {
 	}
 
 	options.processId = processId;
-	lstrcpynW(options.assemblyFile, CA2W(assemblyFile), MAX_PATH);
+	if(assemblyFile)
+		lstrcpynW(options.assemblyFile, CA2W(assemblyFile), MAX_PATH);
+	if(typeName)
+		lstrcpynW(options.typeName, CA2W(typeName), 256);
 
 	InjectionResult result;
 	int retVal = Inject(&options, &result);
@@ -148,7 +158,7 @@ int main(int argc, char** argv) {
 	}
 
 	if (!options.enumerate)
-		printf("Injection successful, return value: %d\n", result.retVal);
+		printf("Injection successful, return value: %0x08X\n", result.retVal);
 
 	return 0;
 }

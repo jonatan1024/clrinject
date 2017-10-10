@@ -32,6 +32,7 @@ struct InjectionOptions {
 	int appDomainIndex;
 	DWORD processId;
 	OLECHAR assemblyFile[MAX_PATH];
+	OLECHAR typeName[256];
 };
 
 int Inject(const InjectionOptions * options, InjectionResult * result);

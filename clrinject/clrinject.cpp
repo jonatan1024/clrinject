@@ -143,10 +143,24 @@ static DWORD WINAPI RemoteProc(void * param) {
 
 			if (!options.enumerate && (!options.appDomainIndex || options.appDomainIndex == appDomainIndex)) {
 				BSTR assemblyFile = _SysAllocString(options.assemblyFile);
-				status = pAppDomain->ExecuteAssembly_2(assemblyFile, &result.retVal);
-				REMOTE_ERROR_STATUS(7, "_AppDomain->ExecuteAssembly failed!");
 
-				resultAppDomain.injected = true;
+				if (!options.typeName[0]) {
+					status = pAppDomain->ExecuteAssembly_2(assemblyFile, &result.retVal);
+					REMOTE_ERROR_STATUS(7, "_AppDomain->ExecuteAssembly failed!");
+					resultAppDomain.injected = true;
+				}
+				else {
+					BSTR typeName = _SysAllocString(options.typeName);
+					mscorlib::_ObjectHandle * instance;
+					status = pAppDomain->CreateInstanceFrom(assemblyFile, typeName, &instance);
+					REMOTE_ERROR_STATUS(8, "_AppDomain->CreateInstanceFrom failed!");
+
+					instance->Release();
+					resultAppDomain.injected = true;
+
+					cleanup8:
+					_SysFreeString(typeName);
+				}
 
 			cleanup7:
 				_SysFreeString(assemblyFile);
