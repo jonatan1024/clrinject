@@ -15,3 +15,4 @@ Opens process with id `<processId>` or name `<processName>`, inject `<assemblyFi
 * `clrinject-cli.exe -p victim.exe -e` (Enumerate Runtimes and AppDomains from victim.exe)
 * `clrinject-cli.exe -p 1234 -a "C:\Path\To\invader.exe" -d 2` (Inject invader.exe into second AppDomain from process with id 1234)
 * `clrinject-cli.exe -p victim.exe -a "C:\Path\To\invader.dll" -i "Invader.Invader"` (Create instance of Invader inside every AppDomain in victim.exe)
+* `clrinject-cli64.exe -p victim64.exe -a "C:\Path\To\invader64.exe"` (Inject x64 assembly into x64 process)

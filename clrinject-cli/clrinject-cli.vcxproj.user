@@ -4,8 +4,16 @@
     <LocalDebuggerCommandArguments>-p victim.exe -a "$(SolutionDir)invader\bin\$(Configuration)\invader.exe" -d 1 -i Invader.Invader</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LocalDebuggerCommandArguments>-p victim.exe -a "$(SolutionDir)invader\bin\x64\$(Configuration)\invader.exe" -d 1 -i Invader.Invader</LocalDebuggerCommandArguments>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LocalDebuggerCommandArguments>-p victim.exe -a "$(SolutionDir)invader\bin\$(Configuration)\invader.exe" -d 1 -i Invader.Invader</LocalDebuggerCommandArguments>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LocalDebuggerCommandArguments>-p victim.exe -a "$(SolutionDir)invader\bin\x64\$(Configuration)\invader.exe" -d 1 -i Invader.Invader</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
 </Project>

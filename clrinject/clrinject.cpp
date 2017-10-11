@@ -9,7 +9,9 @@
 }
 
 struct RemoteDataStruct {
-	int relocation;
+#ifndef _WIN64
+	INT relocation;
+#endif
 	HMODULE(WINAPI *GetModuleHandleA)(LPCSTR);
 	FARPROC(WINAPI *GetProcAddress)(HMODULE, LPCSTR);
 	HANDLE(WINAPI *GetCurrentProcess)();
@@ -35,10 +37,14 @@ struct RemoteDataStruct {
 #include <metahost.h>
 #import <mscorlib.tlb> raw_interfaces_only auto_rename
 
+#ifndef _WIN64
 #define CT(constant, type) ((type)((const byte *)constant + (RELOCATION)))
 #define CA(constant) CT(constant, decltype(constant))
 #define CC(constant) (*CA(&constant))
 #define RELOCATION localData->relocation
+#else
+#define CC(constant) (constant)
+#endif
 
 #define REMOTE_ERROR_RET(cleanupLevel, message, returnValue) do {\
 	result.status = localData->GetLastError();\
@@ -259,7 +265,9 @@ int Inject(const InjectionOptions * options, InjectionResult * result) {
 		INJECT_ERROR(2, "WriteProcessMemory for remote procedure code failed!");
 
 	RemoteDataStruct localData;
+#ifndef _WIN64
 	localData.relocation = (byte*)remoteSectionAddr - (byte*)remoteSection;
+#endif
 	localData.GetModuleHandleA = GetModuleHandleA;
 	localData.GetProcAddress = GetProcAddress;
 	localData.GetCurrentProcess = GetCurrentProcess;

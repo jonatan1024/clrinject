@@ -3,7 +3,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <atlbase.h>
+#ifndef _WIN64
 #pragma comment(lib, "clrinject.lib")
+#else
+#pragma comment(lib, "clrinject64.lib")
+#endif
 #include <clrinject.h>
 
 DWORD GetProcessIdByName(const char * processName) {
@@ -158,7 +162,7 @@ int main(int argc, char** argv) {
 	}
 
 	if (!options.enumerate)
-		printf("Injection successful, return value: %0x08X\n", result.retVal);
+		printf("Injection successful, return value: 0x%08X\n", result.retVal);
 
 	return 0;
 }
