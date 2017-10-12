@@ -1,5 +1,5 @@
 # clrinject
-Injects C# EXE or DLL Assembly into every CLR runtime and AppDomain of another process. 
+Injects C# EXE or DLL Assembly into any CLR runtime and AppDomain of another process. The injected assembly can then access static instances of the injectee process's classes and therefore affect it's internal state.
 
 ## Usage
 `clrinject-cli.exe -p <processId/processName> -a <assemblyFile>`
