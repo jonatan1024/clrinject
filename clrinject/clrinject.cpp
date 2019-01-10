@@ -1,6 +1,5 @@
 #include <Windows.h>
 #include <string.h>
-#include <intrin.h>
 #include "clrinject.h"
 
 #define STRCPY(destination, source) for (int i = 0; ; i++) {\

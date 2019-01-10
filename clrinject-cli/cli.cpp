@@ -2,7 +2,6 @@
 #include <tlhelp32.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <atlbase.h>
 #ifndef _WIN64
 #pragma comment(lib, "clrinject.lib")
 #else
@@ -43,6 +42,23 @@ void usage() {
 	);
 	exit(1);
 }
+
+class SZStringToOleString {
+	OLECHAR * data;
+public:
+	SZStringToOleString(const char * in_data) {
+		data = new OLECHAR[strlen(in_data) + 1];
+		for (size_t i = 0; i <= strlen(in_data); i++) {
+			data[i] = in_data[i];
+		}
+	}
+	operator OLECHAR*() {
+		return data;
+	}
+	~SZStringToOleString() {
+		delete[] data;
+	}
+};
 
 int main(int argc, char** argv) {
 	InjectionOptions options = {};
@@ -110,9 +126,9 @@ int main(int argc, char** argv) {
 
 	options.processId = processId;
 	if(assemblyFile)
-		lstrcpynW(options.assemblyFile, CA2W(assemblyFile), MAX_PATH);
+		lstrcpynW(options.assemblyFile, SZStringToOleString(assemblyFile), MAX_PATH);
 	if(typeName)
-		lstrcpynW(options.typeName, CA2W(typeName), 256);
+		lstrcpynW(options.typeName, SZStringToOleString(typeName), 256);
 
 	InjectionResult result;
 	int retVal = Inject(&options, &result);
