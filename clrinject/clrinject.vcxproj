@@ -91,6 +91,7 @@
     <ClCompile>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level3</WarningLevel>
+      <SupportJustMyCode>false</SupportJustMyCode>
     </ClCompile>
     <Link />
     <Link />
@@ -99,6 +100,7 @@
     <ClCompile>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WarningLevel>Level3</WarningLevel>
+      <SupportJustMyCode>false</SupportJustMyCode>
     </ClCompile>
     <Link />
     <Link />
