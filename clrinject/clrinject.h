@@ -4,18 +4,18 @@
 #define MAX_RUNTIMES 8
 #define MAX_APPDOMAINS 32
 
-struct AppDomain {
+struct AppDomainInfo {
 	OLECHAR friendlyName[256];
 	bool injected;
 };
 
-struct Runtime {
+struct RuntimeInfo {
 	WCHAR version[32];
 	BOOL started;
 	DWORD startedFlags;
 
 	int numAppDomains;
-	AppDomain appDomains[MAX_APPDOMAINS];
+	AppDomainInfo appDomains[MAX_APPDOMAINS];
 };
 
 struct InjectionResult {
@@ -24,7 +24,7 @@ struct InjectionResult {
 	char statusMessage[256];
 
 	int numRuntimes;
-	Runtime runtimes[MAX_RUNTIMES];
+	RuntimeInfo runtimes[MAX_RUNTIMES];
 };
 
 struct InjectionOptions {

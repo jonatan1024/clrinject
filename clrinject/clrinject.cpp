@@ -103,7 +103,7 @@ static DWORD WINAPI RemoteProc(void * param) {
 			retVal = 2;
 			goto cleanup2;
 		}
-		Runtime& resultRuntime = result.runtimes[result.numRuntimes++];
+		RuntimeInfo& resultRuntime = result.runtimes[result.numRuntimes++];
 
 		ICLRRuntimeInfo* pCLRRuntimeInfo = NULL;
 		status = pCLRRuntimeInfoThunk->QueryInterface(CC(IID_ICLRRuntimeInfo), (LPVOID*)&pCLRRuntimeInfo);
@@ -134,7 +134,7 @@ static DWORD WINAPI RemoteProc(void * param) {
 				retVal = 2;
 				goto cleanup5;
 			}
-			AppDomain& resultAppDomain = resultRuntime.appDomains[resultRuntime.numAppDomains++];
+			AppDomainInfo& resultAppDomain = resultRuntime.appDomains[resultRuntime.numAppDomains++];
 
 			mscorlib::_AppDomain * pAppDomain = NULL;
 			status = pAppDomainThunk->QueryInterface(CC(__uuidof(mscorlib::_AppDomain)), (LPVOID*)&pAppDomain);
