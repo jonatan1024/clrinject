@@ -1,6 +1,8 @@
 ﻿
 using System;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 
 namespace InjectorApp
 {
@@ -11,23 +13,55 @@ namespace InjectorApp
             try
             {
                 Injector injector = new Injector();
+
+                //Test enumeration
                 var result = injector.EnumerateAppDomains("victim.exe");
 
                 if (result.Any())
-                    Console.WriteLine(result[0].AppDomains[0]);
+                {
+                    result.ForEach(r =>
+                    {
+                        var runtimeInfo = r.IsRuntimeStarted ? "started" : "stopped";
+                        Console.WriteLine($"Runtime Version : {r.runtimeVersion} is {runtimeInfo}, and have following app domains:");
+                        int index = 0;
+                        r.AppDomains.ForEach(appd => Console.WriteLine($"{++index}. {appd}"));
+                    });
+                }
+                else
+                {
+                    Console.WriteLine("Enumeration yielded no result");
+                }
 
-                Console.ReadLine();
+                Console.WriteLine();
+
+                //Test injection in all app domains
+                //injector.InjectIntoProcess("victim.exe", PathOfProcessToInject);
+
+                //Test injection in the specified app domain
+                injector.InjectIntoProcess("victim.exe", PathOfProcessToInject, 3);
 
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Console.WriteLine(ex.InnerException);
             }
+
+            Console.ReadLine();
         }
 
-        public void SayHello()
+        public static string PathOfProcessToInject
         {
-            Console.WriteLine("Hello World");
+            get
+            {
+                var assembly = Assembly.GetExecutingAssembly();
+                string codeBase = assembly.CodeBase;
+                UriBuilder uri = new UriBuilder(codeBase);
+                var projectRootDirectory = Directory.GetParent(Path.GetDirectoryName(Uri.UnescapeDataString(uri.Path))).Parent.Parent.Parent;
+                string buildMode = codeBase.Contains("Debug") ? "Debug" : "Release";
+                var assemblyName = AssemblyName.GetAssemblyName(assembly.FullName.Split(',')[0] + ".exe");
+                var assemblyArchitecture = assemblyName.ProcessorArchitecture == ProcessorArchitecture.Amd64 ? "x64" : "x86";
+                return $"{projectRootDirectory.FullName}\\invader\\bin\\{assemblyArchitecture}\\{buildMode}\\invader.exe";
+            }
         }
     }
 }
