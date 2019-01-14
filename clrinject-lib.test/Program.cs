@@ -1,5 +1,6 @@
 ﻿
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -10,8 +11,16 @@ namespace InjectorApp
     {
         static void Main(string[] args)
         {
+            Process victimProcess = null;
+
             try
             {
+                victimProcess = Process.Start(PathOfVictimApp);
+                if (!victimProcess.IsRunning())
+                    return;
+
+                System.Threading.Thread.Sleep(TimeSpan.FromSeconds(6));
+
                 Injector injector = new Injector();
 
                 //Test enumeration
@@ -19,12 +28,12 @@ namespace InjectorApp
 
                 if (result.Any())
                 {
-                    result.ForEach(r =>
+                    result.ForEach(runtime =>
                     {
-                        var runtimeInfo = r.IsRuntimeStarted ? "started" : "stopped";
-                        Console.WriteLine($"Runtime Version : {r.runtimeVersion} is {runtimeInfo}, and have following app domains:");
+                        var runtimeStatus = runtime.IsRuntimeStarted ? "started" : "stopped";
+                        Console.WriteLine($"Runtime Version : {runtime.runtimeVersion} is {runtimeStatus}, and have following app domains:");
                         int index = 0;
-                        r.AppDomains.ForEach(appd => Console.WriteLine($"{++index}. {appd}"));
+                        runtime.AppDomains.ForEach(appd => Console.WriteLine($"{++index}. {appd}"));
                     });
                 }
                 else
@@ -45,23 +54,58 @@ namespace InjectorApp
             {
                 Console.WriteLine(ex.InnerException);
             }
-
+           
+            Console.WriteLine("Press any key to exit.");
             Console.ReadLine();
+
+            victimProcess.Kill();
+
         }
 
         public static string PathOfProcessToInject
         {
             get
             {
-                var assembly = Assembly.GetExecutingAssembly();
-                string codeBase = assembly.CodeBase;
-                UriBuilder uri = new UriBuilder(codeBase);
-                var projectRootDirectory = Directory.GetParent(Path.GetDirectoryName(Uri.UnescapeDataString(uri.Path))).Parent.Parent.Parent;
-                string buildMode = codeBase.Contains("Debug") ? "Debug" : "Release";
-                var assemblyName = AssemblyName.GetAssemblyName(assembly.FullName.Split(',')[0] + ".exe");
-                var assemblyArchitecture = assemblyName.ProcessorArchitecture == ProcessorArchitecture.Amd64 ? "x64" : "x86";
-                return $"{projectRootDirectory.FullName}\\invader\\bin\\{assemblyArchitecture}\\{buildMode}\\invader.exe";
+                return GetPath("invader");
             }
+        }
+
+        public static string PathOfVictimApp
+        {
+            get
+            {
+                return GetPath("victim");
+            }
+        }
+
+        private static string GetPath(string appName)
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+            string codeBase = assembly.CodeBase;
+            UriBuilder uri = new UriBuilder(codeBase);
+            var projectRootDirectory = Directory.GetParent(Path.GetDirectoryName(Uri.UnescapeDataString(uri.Path))).Parent.Parent.Parent;
+            string buildMode = codeBase.Contains("Debug") ? "Debug" : "Release";
+            var assemblyName = AssemblyName.GetAssemblyName(assembly.FullName.Split(',')[0] + ".exe");
+            var assemblyArchitecture = assemblyName.ProcessorArchitecture == ProcessorArchitecture.Amd64 ? "x64" : "x86";
+            return $"{projectRootDirectory.FullName}\\{appName}\\bin\\{assemblyArchitecture}\\{buildMode}\\{appName}.exe";
+        }
+    }
+
+    public static class ProcessExtensions
+    {
+        public static bool IsRunning(this Process process)
+        {
+            if (process == null)
+                throw new ArgumentNullException("process");
+            try
+            {
+                Process.GetProcessById(process.Id);
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+            return true;
         }
     }
 }
