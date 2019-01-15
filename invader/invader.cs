@@ -9,11 +9,10 @@ namespace Invader
     public class Invader
     {
         static int Main(string[] args) { 
-            Console.WriteLine("data = "+ AppDomain.CurrentDomain.GetData("dummy"));
-            Console.Write("new data = ");
-            AppDomain.CurrentDomain.SetData("dummy", Console.ReadLine());
+            Console.WriteLine("Current data is: "+ AppDomain.CurrentDomain.GetData("dummy"));
+            AppDomain.CurrentDomain.SetData("dummy", "You have been invaded !!");
 
-            return 0x12345678;
+            return 0;
         }
 
         public Invader()

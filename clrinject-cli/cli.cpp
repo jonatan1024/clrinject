@@ -136,10 +136,10 @@ int main(int argc, char** argv) {
 		printf("Enumeration:\n");
 		int index = 1;
 		for (int i = 0; i < result.numRuntimes; i++) {
-			const Runtime& runtime = result.runtimes[i];
+			const RuntimeInfo& runtime = result.runtimes[i];
 			printf("#\tRuntime Version: '%ls', %s\n", runtime.version, runtime.started ? "is started" : "is not started");
 			for (int j = 0; j < runtime.numAppDomains; j++) {
-				const AppDomain& appDomain = runtime.appDomains[j];
+				const AppDomainInfo& appDomain = runtime.appDomains[j];
 				printf("#%d\t\tAppDomain Name: '%ls'\n", index++, appDomain.friendlyName);
 			}
 		}
@@ -148,9 +148,9 @@ int main(int argc, char** argv) {
 	else {
 		printf("Injection succeeded for following Runtimes and AppDomains:\n");
 		for (int i = 0; i < result.numRuntimes; i++) {
-			const Runtime& runtime = result.runtimes[i];
+			const RuntimeInfo& runtime = result.runtimes[i];
 			for (int j = 0; j < runtime.numAppDomains; j++) {
-				const AppDomain& appDomain = runtime.appDomains[j];
+				const AppDomainInfo& appDomain = runtime.appDomains[j];
 				if(appDomain.injected)
 					printf("\tRuntime '%ls', AppDomain '%ls'\n", runtime.version, appDomain.friendlyName);
 			}
@@ -158,9 +158,9 @@ int main(int argc, char** argv) {
 		printf("Injection failed for following Runtimes and AppDomains:\n");
 		int index = 1;
 		for (int i = 0; i < result.numRuntimes; i++) {
-			const Runtime& runtime = result.runtimes[i];
+			const RuntimeInfo& runtime = result.runtimes[i];
 			for (int j = 0; j < runtime.numAppDomains; j++) {
-				const AppDomain& appDomain = runtime.appDomains[j];
+				const AppDomainInfo& appDomain = runtime.appDomains[j];
 				if (!appDomain.injected && (!options.appDomainIndex || options.appDomainIndex == index))
 					printf("\tRuntime '%ls', AppDomain '%ls'\n", runtime.version, appDomain.friendlyName);
 				index++;
